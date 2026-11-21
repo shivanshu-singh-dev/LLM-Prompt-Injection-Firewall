@@ -19,8 +19,10 @@ data/cache/
 *.zip
 
 # Model weights & training artifacts
+models/baseline/
 models/checkpoints/
 models/deberta-v3-firewall/
+*.joblib
 *.pt
 *.bin
 *.safetensors
