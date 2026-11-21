@@ -1,6 +1,32 @@
-﻿venv/
+# Python & Virtual Environments
+venv/
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# Environment & Config
 .env
+.env.local
 .vscode/
+.idea/
+
+# Raw data and download caches (processed JSONL is tracked)
+data/raw/
+data/cache/
+*.tar.gz
+*.zip
+
+# Model weights & training artifacts
+models/checkpoints/
+models/deberta-v3-firewall/
+*.pt
+*.bin
+*.safetensors
+.ipynb_checkpoints/
+
+# Runtime and scan results
 results/
+logs/
+*.log
