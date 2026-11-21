@@ -22,6 +22,7 @@ data/cache/
 models/baseline/
 models/checkpoints/
 models/deberta-v3-firewall/
+models/tradeoff-model/
 *.joblib
 *.pt
 *.bin
