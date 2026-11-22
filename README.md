@@ -39,6 +39,7 @@ Incoming Prompt ───►│  [ Layer 1: Fast Heuristics / Known Pattern Rule
 - **Three-Tier Decision Logic**: Configurable `ALLOW`, `FLAG` (attaches audit headers), and `BLOCK` (immediate safe refusal) actions.
 - **Multi-Turn Conversational Defense**: Stateful session tracking, sliding window concatenation, and exponential risk decay to intercept crescendo and split-turn attacks.
 - **Canary & Output Inspection**: Real-time response verification for internal canary tokens (e.g., `NW-7734-ADMIN`) with automated secret redaction.
+- **Adaptive Red-Teaming & Hardening**: Mutation harness generating 414 adversarial evasion vectors across 6 mutation categories to evaluate and harden filters.
 - **Zero-Day Generalization Testing**: Leave-One-Attack-Family-Out (LOFO) cross-validation evaluating robustness against completely unseen attack families.
 - **Hard-Negative Evaluation**: Dedicated benchmark testing False Positive Rate (FPR) on benign prompts containing suspicious trigger keywords (`ignore`, `override`, `system`, technical logs).
 - **OpenAI-Compatible Proxy**: Drop-in reverse proxy compatible with any standard OpenAI chat completion client.
@@ -58,6 +59,11 @@ Incoming Prompt ───►│  [ Layer 1: Fast Heuristics / Known Pattern Rule
 │   ├── canary.py           # Output inspection and secret redaction
 │   ├── multi_turn.py       # Multi-turn session tracker and sliding window risk
 │   └── audit_log.py        # Asynchronous JSONL request and verdict logger
+├── redteam/                # Adaptive red-teaming mutation & hardening
+│   ├── mutators.py         # 6 evasion mutators (Base64, Leetspeak, ROT13, Splitting, etc.)
+│   ├── attack_firewall.py  # Automated attack harness evaluating firewall bypasses
+│   ├── adversarial_retraining.py # Robust retraining on adversarial mutations
+│   └── evaluate_hardening.py # Before vs after bypass benchmark on held-out mutations
 ├── benchmarks/             # Latency & throughput profiling
 │   ├── benchmark_latency.py# Per-request p50, p95, p99 latency benchmarking (batch_size=1)
 │   └── benchmark_proxy.py  # Full proxy overhead latency suite
@@ -88,8 +94,9 @@ Incoming Prompt ───►│  [ Layer 1: Fast Heuristics / Known Pattern Rule
 ├── training/               # Fine-tuning pipelines
 │   ├── train_deberta.py    # DeBERTa-v3-small Hugging Face Trainer script
 │   └── train_tradeoff.py   # Lightweight tradeoff model trainer (MiniLM/DistilBERT)
-├── tests/                  # Automated integration test suite
-│   └── test_firewall.py    # End-to-end proxy and defense unit tests
+├── tests/                  # Automated test suite
+│   ├── test_firewall.py    # End-to-end proxy and defense integration tests
+│   └── test_redteam.py     # Mutator and splitting unit tests
 ├── detectors/              # Scanner detectors (red-team harness)
 │   ├── heuristic.py        # Exact marker substring & regex matching
 │   ├── embedding.py        # Semantic similarity via sentence-transformers
@@ -205,7 +212,28 @@ python run_generalization_benchmark.py
 | **TF-IDF Baseline** | 0.9518 [0.915 - 0.981] | 0.6835 | **-0.2682** | 13.75% | **1.41 ms** |
 | **DeBERTa-v3-small** | *Colab training ready* | *Target: >0.85* | *Target: <-0.10* | *Target: <2.0%* | ~25 ms |
 
-### 2. Multi-Turn Conversational Defense Benchmark
+### 2. Adaptive Red-Teaming & Hardening Benchmark
+
+To evaluate defense against 414 mutated adversarial attacks across 6 evasion strategies, before and after adversarial retraining (measured on a **strictly held-out mutation test set**):
+
+```bash
+python -m redteam.evaluate_hardening
+```
+
+| Mutation Strategy | Before Bypass Rate | After Bypass Rate | Absolute Reduction | Relative Drop |
+|---|---|---|---|---|
+| **`base64`** | 85.71% | **0.00%** | -85.71% | -100.0% |
+| **`leetspeak`** | 100.00% | **3.57%** | -96.43% | -96.4% |
+| **`rot13`** | 21.43% | **0.00%** | -21.43% | -100.0% |
+| **`multilingual`** | 21.43% | **0.00%** | -21.43% | -100.0% |
+| **`payload_split`** | 14.29% | **0.00%** | -14.29% | -100.0% |
+| **`code_block`** | 7.14% | **0.00%** | -7.14% | -100.0% |
+| **OVERALL HELD-OUT** | **41.67%** | **0.60%** | **-41.07%** | **-98.6%** |
+
+> [!IMPORTANT]
+> The initial firewall suffered a **41.67% bypass rate** on mutated inputs (particularly against leetspeak and base64). Adversarial retraining with character and word n-gram features reduced the bypass rate to **0.60%** on held-out test attacks that were strictly never seen during training.
+
+### 3. Multi-Turn Conversational Defense Benchmark
 
 To evaluate defense against multi-turn crescendo and context fragmentation attacks:
 
@@ -216,13 +244,10 @@ python -m eval.evaluate_multiturn
 | Defense Mode | Attack Detection Rate | Benign False Positive Rate | Conversational F1 |
 |---|---|---|---|
 | **Single-Turn Isolation** | 60.00% | **0.00%** | 0.7500 |
-| **Multi-Turn Window + Risk Accumulator** | **90.00%** | 50.00% (baseline model) | **0.7826** |
+| **Multi-Turn Window + Risk Accumulator** | **90.00%** | 50.00% *(baseline model)* | **0.7826** |
 | **Improvement** | **+30.00%** | — | **+0.0326** |
 
-> [!NOTE]
-> Evaluating dialogue turns in isolation fails to catch **40%** of multi-turn crescendo and split attacks. The multi-turn sliding window risk accumulator increases detection rate by **+30.00%**.
-
-### 3. Proxy Overhead Latency
+### 4. Proxy Overhead Latency
 
 Reproducible via `python -m benchmarks.benchmark_proxy`:
 
